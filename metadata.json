@@ -1,0 +1,7 @@
+{
+  "name": "TripDiary - Personal AI Diary",
+  "description": "A beautiful, private diary application with mood tracking, photo uploads, and AI-powered emotional reflection.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

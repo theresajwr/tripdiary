@@ -1,60 +1,121 @@
-
-import React from 'react';
-import { DiaryEntry, MoodMap } from '../types';
+import React, { useEffect, useState } from "react";
+import { DiaryEntry } from "../types";
+import { supabase } from "../supabase";
 
 interface DiaryListProps {
-  entries: DiaryEntry[];
-  onDelete: (id: string) => void;
+  entries: DiaryEntry[]; // masih dipakai untuk fallback/local
+  groupCode: string;
 }
 
-export const DiaryList: React.FC<DiaryListProps> = ({ entries, onDelete }) => {
-  if (entries.length === 0) {
+export const DiaryList: React.FC<DiaryListProps> = ({ groupCode }) => {
+  const [loading, setLoading] = useState(false);
+  const [entries, setEntries] = useState<DiaryEntry[]>([]);
+
+  // ✅ Fetch entries dari Supabase berdasarkan kode grup
+  const fetchEntries = async () => {
+    if (!groupCode) return;
+
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("entries")
+      .select("*")
+      .eq("group_code", groupCode)
+      .order("created_at", { ascending: false });
+
+    setLoading(false);
+
+    if (error) {
+      alert("Gagal load diary: " + error.message);
+      return;
+    }
+
+    if (data) {
+      // Convert Supabase data → DiaryEntry format
+      const formatted: DiaryEntry[] = data.map((item: any) => ({
+        id: item.id,
+        date: new Date(item.created_at).toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+        title: item.title,
+        content: item.content,
+        mood: item.mood,
+        image: item.image || undefined,
+        createdAt: new Date(item.created_at).getTime(),
+      }));
+
+      setEntries(formatted);
+    }
+  };
+
+  // ✅ Auto load setiap groupCode berubah
+  useEffect(() => {
+    fetchEntries();
+  }, [groupCode]);
+
+  // UI Loading
+  if (loading) {
     return (
-      <div className="text-center py-20">
-        <div className="text-6xl mb-4">✍️</div>
-        <h3 className="text-xl font-medium text-slate-400">Your diary is empty. Start writing today.</h3>
+      <div className="text-center py-10 text-slate-400">
+        Loading diary entries...
       </div>
     );
   }
 
+  // UI Jika belum ada kode grup
+  if (!groupCode) {
+    return (
+      <div className="text-center py-10 text-slate-400">
+        Masukkan kode grup dulu untuk melihat diary 📌
+      </div>
+    );
+  }
+
+  // UI Jika belum ada entry
+  if (entries.length === 0) {
+    return (
+      <div className="text-center py-10 text-slate-400">
+        Belum ada diary entry untuk grup ini ✨
+      </div>
+    );
+  }
+
+  // UI List Entries
   return (
-    <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-1 max-w-4xl mx-auto">
+    <div className="space-y-6">
       {entries.map((entry) => (
-        <article key={entry.id} className="bg-white rounded-3xl overflow-hidden shadow-md border border-slate-100 hover:shadow-xl transition-shadow duration-300">
-          <div className="p-8">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <p className="text-indigo-600 text-sm font-bold uppercase tracking-widest mb-1">{entry.date}</p>
-                <h2 className="text-2xl font-serif font-bold text-slate-800">{entry.title}</h2>
-              </div>
-              <div className={`text-3xl p-3 rounded-2xl ${MoodMap[entry.mood].bgColor}`}>
-                {entry.mood}
-              </div>
-            </div>
-
-            <p className="text-slate-600 leading-relaxed mb-6 whitespace-pre-wrap">{entry.content}</p>
-
-            {entry.image && (
-              <img 
-                src={entry.image} 
-                alt={entry.title} 
-                className="w-full h-80 object-cover rounded-2xl mb-6"
-              />
-            )}
-
-            <div className="flex justify-end">
-              <button 
-                onClick={() => onDelete(entry.id)}
-                className="text-slate-300 hover:text-red-500 transition-colors flex items-center gap-1 text-sm font-medium"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                Delete Entry
-              </button>
-            </div>
+        <div
+          key={entry.id}
+          className="bg-white rounded-3xl shadow-lg border border-slate-100 p-6 space-y-3 animate-in fade-in duration-500"
+        >
+          {/* Mood + Date */}
+          <div className="flex items-center justify-between text-sm text-slate-400">
+            <span className="text-lg">{entry.mood}</span>
+            <span>{entry.date}</span>
           </div>
-        </article>
+
+          {/* Title */}
+          <h2 className="text-2xl font-serif text-slate-800">
+            {entry.title}
+          </h2>
+
+          {/* Content */}
+          <p className="text-slate-600 leading-relaxed whitespace-pre-line">
+            {entry.content}
+          </p>
+
+          {/* Image */}
+          {entry.image && (
+            <img
+              src={entry.image}
+              alt="Diary"
+              className="w-full h-64 object-cover rounded-2xl mt-4"
+            />
+          )}
+        </div>
       ))}
     </div>
   );
